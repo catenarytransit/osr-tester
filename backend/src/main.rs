@@ -218,7 +218,12 @@ struct RouteReply {
 }
 
 impl RouteReply {
-    fn from_native(result: ffi::RouteResult, graph: GraphInfo, queue_ms: f64, routing_ms: f64) -> Self {
+    fn from_native(
+        result: ffi::RouteResult,
+        graph: GraphInfo,
+        queue_ms: f64,
+        routing_ms: f64,
+    ) -> Self {
         let mut lines = Vec::new();
         let mut segments = Vec::with_capacity(result.segments.len());
         let mut points = 0;
@@ -233,7 +238,9 @@ impl RouteReply {
                 lines.push(coords);
             }
             segments.push(RouteSegment {
-                osm_way_id: segment.has_osm_way_id.then(|| segment.osm_way_id.to_string()),
+                osm_way_id: segment
+                    .has_osm_way_id
+                    .then(|| segment.osm_way_id.to_string()),
                 from_node_index: segment.from_node,
                 to_node_index: segment.to_node,
                 mode_code: segment.mode,
@@ -282,7 +289,10 @@ fn nearest_candidates(
     point: Point,
     radius: f64,
 ) -> Result<Vec<SnapDiagnostic>> {
-    let mut candidates: Vec<_> = router.snap(&point.native(), radius, false)?.into_iter().collect();
+    let mut candidates: Vec<_> = router
+        .snap(&point.native(), radius, false)?
+        .into_iter()
+        .collect();
     candidates.sort_by(|a, b| {
         a.distance_to_way_meters
             .total_cmp(&b.distance_to_way_meters)
@@ -423,10 +433,13 @@ async fn route(
             reply,
         })
         .map_err(|e| match e {
-            mpsc::TrySendError::Full(_) => error(StatusCode::TOO_MANY_REQUESTS, "routing queue full"),
-            mpsc::TrySendError::Disconnected(_) => {
-                error(StatusCode::SERVICE_UNAVAILABLE, "routing worker unavailable")
+            mpsc::TrySendError::Full(_) => {
+                error(StatusCode::TOO_MANY_REQUESTS, "routing queue full")
             }
+            mpsc::TrySendError::Disconnected(_) => error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "routing worker unavailable",
+            ),
         })?;
 
     let result = receiver
@@ -461,10 +474,14 @@ async fn main() -> Result<()> {
         .init();
 
     let data_dir = PathBuf::from(
-        env::var("OSR_DATA_DIR").context("OSR_DATA_DIR must point to an osr-extract output folder")?,
+        env::var("OSR_DATA_DIR")
+            .context("OSR_DATA_DIR must point to an osr-extract output folder")?,
     );
     if !data_dir.is_dir() {
-        return Err(anyhow!("OSR_DATA_DIR is not a directory: {}", data_dir.display()));
+        return Err(anyhow!(
+            "OSR_DATA_DIR is not a directory: {}",
+            data_dir.display()
+        ));
     }
     let state = Arc::new(start_worker(data_dir)?);
     tracing::info!(?state.graph, "OSR routing graph loaded");
@@ -490,9 +507,30 @@ mod tests {
 
     #[test]
     fn coordinate_validation_rejects_out_of_range() {
-        assert!(Point { lat: 33.6, lon: -117.8 }.validate().is_ok());
-        assert!(Point { lat: 91.0, lon: 0.0 }.validate().is_err());
-        assert!(Point { lat: 0.0, lon: -181.0 }.validate().is_err());
+        assert!(
+            Point {
+                lat: 33.6,
+                lon: -117.8
+            }
+            .validate()
+            .is_ok()
+        );
+        assert!(
+            Point {
+                lat: 91.0,
+                lon: 0.0
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            Point {
+                lat: 0.0,
+                lon: -181.0
+            }
+            .validate()
+            .is_err()
+        );
     }
 
     #[test]
@@ -521,11 +559,14 @@ mod tests {
         .unwrap();
         assert_eq!(req.profile.native() as u8, Profile::Wheelchair as u8);
         assert_eq!(req.algorithm.native() as u8, Algorithm::Dijkstra as u8);
-        assert!(serde_json::from_value::<RouteRequest>(json!({
-            "from": {"lat": 0, "lon": 0},
-            "to": {"lat": 1, "lon": 1},
-            "profile": "bike_sharing"
-        })).is_err());
+        assert!(
+            serde_json::from_value::<RouteRequest>(json!({
+                "from": {"lat": 0, "lon": 0},
+                "to": {"lat": 1, "lon": 1},
+                "profile": "bike_sharing"
+            }))
+            .is_err()
+        );
     }
 
     #[test]
@@ -540,7 +581,11 @@ mod tests {
             elevation_down: 0,
             segments: vec![],
         };
-        let graph = GraphInfo { node_count: 1, way_count: 1, has_elevations: false };
+        let graph = GraphInfo {
+            node_count: 1,
+            way_count: 1,
+            has_elevations: false,
+        };
         let empty = RouteReply::from_native(native.clone(), graph.clone(), 0.0, 1.0);
         assert!(empty.geometry.is_none());
         native.segments.push(ffi::PathSegment {
@@ -558,7 +603,7 @@ mod tests {
             elevation_down: 0,
             geometry: vec![
                 ffi::Coordinate::outdoor(33.65, -117.85),
-                ffi::Coordinate::outdoor(33.66, -117.84)
+                ffi::Coordinate::outdoor(33.66, -117.84),
             ],
         });
         let result = RouteReply::from_native(native, graph, 0.0, 1.0);
