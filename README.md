@@ -41,9 +41,12 @@ OSR_DATA_DIR="$(realpath ../data/irvine)" cargo run --release
 
 The server opens the graph once at startup and listens on **127.0.0.1:3000**.
 Change with `BIND_ADDR`. If the graph cannot be opened the server exits with
-an error; it never returns fabricated routes. Native shared-library files built
-by `osr-ffi` must remain available at runtime (Cargo sets a Linux rpath for
-its development/build directory; deploy the shared library when moving binaries).
+an error; it never returns fabricated routes. On Linux, the backend build copies `libcatenary_osr_bridge.so` into
+`backend/target/release/lib/` (or `target/debug/lib/`) and sets the executable's
+`$ORIGIN/lib` RUNPATH. When deploying, copy the executable **and** its `lib/`
+directory together. Other system-native dependencies must also be installed.
+Verify with `ldd target/release/osr-tester` and
+`readelf -d target/release/osr-tester | grep RUNPATH`.
 
 Terminal 2:
 
